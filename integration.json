@@ -1,0 +1,62 @@
+{
+  "data": {
+    "date": {
+      "created_at": "2025-02-20",
+      "updated_at": "2025-02-20"
+    },
+    "descriptions": {
+      "app_description": "Monitor GitHub repositories and receive notifications about issues, pull requests, and commits.",
+      "app_logo": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+      "app_name": "GitHub Integration",
+      "app_url": "https://github.com",
+      "background_color": "#24292e"
+    },
+    "integration_category": "Development & Code Management",
+    "integration_type": "interval",
+    "is_active": true,
+    "output": [
+      {
+        "label": "github_updates",
+        "value": true
+      }
+    ],
+    "key_features": [
+      "Receive notifications for new issues",
+      "Monitor pull request activity",
+      "Track repository commits",
+      "Get alerts for repository events"
+    ],
+    "settings": [
+      {
+        "label": "interval",
+        "type": "text",
+        "required": true,
+        "default": "*/5 * * * *"
+      },
+      {
+        "label": "repository_url",
+        "type": "text",
+        "required": true,
+        "description": "GitHub repository URL (format: owner/repo)",
+        "default": ""
+      },
+      {
+        "label": "events_to_monitor",
+        "type": "multi-select",
+        "required": true,
+        "description": "Select events to monitor",
+        "default": "issues,pull_request,push",
+        "options": ["issues", "pull_request", "push", "commit_comment"]
+      },
+      {
+        "label": "github_token",
+        "type": "text",
+        "required": true,
+        "description": "GitHub Personal Access Token",
+        "default": ""
+      }
+    ],
+    "tick_url": "http://localhost:3000/github/tick",
+    "target_url": "http://localhost:3000/github-webhook"
+  }
+}
