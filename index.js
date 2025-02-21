@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
+const crypto = require('crypto');
 const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT;
@@ -28,22 +29,35 @@ app.post('/github-webhook', async (req, res) => {
   });
   try {
     const eventType = req.headers['x-github-event'];
+    const signature = req.headers['x-hub-signature-256'];
     const payload = req.body;
     
+    const orgSettings = await getOrgSettingsForRepo(payload.repository.full_name);
+    
+    if (!orgSettings) {
+      console.log(`No organization found for repository: ${payload.repository.full_name}`);
+      return res.status(200).json({ message: 'Repository not configured' });
+    }
+
+    if (!verifyWebhookSignature(req.body, signature, orgSettings.webhookSecret)) {
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
     const telexPayload = {
       event_name: `GitHub ${eventType}`,
       message: formatGitHubMessage(eventType, payload),
       status: "success",
-      username: "GitHub"
+      username: "GitHub",
+      organization_id: orgSettings.organizationId
     };
     
-    await axios.post(process.env.TELEX_WEBHOOK_URL, telexPayload, {
+    await axios.post(orgSettings.telexWebhookUrl, telexPayload, {
       headers: {
         'Content-Type': 'application/json'
       }
     });
     
-    console.log('Event processed:', telexPayload);
+    console.log('Event processed:', orgSettings.organizationId);
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Error:', error);
@@ -51,12 +65,18 @@ app.post('/github-webhook', async (req, res) => {
   }
 });
 
+function verifyWebhookSignature(payload, signature, secret) {
+  const hmac = crypto.createHmac('sha256', secret);
+  const digest = 'sha256=' + hmac.update(JSON.stringify(payload)).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signature));
+}
+
 app.post('/github/tick', async (req, res) => {
   console.log('Received tick:', {
     body: req.body
   });
   try {
-    const { return_url, settings } = req.body;
+    const { return_url, settings, organization_id  } = req.body;
     
     if (!settings.github_token || !settings.repository_url) {
       throw new Error('Missing required settings');
@@ -69,7 +89,8 @@ app.post('/github/tick', async (req, res) => {
         event_name: "GitHub Update",
         message: formatUpdateMessage(githubData),
         status: "success",
-        username: "GitHub"
+        username: "GitHub",
+        organization_id: organization_id
       });
     }
     
