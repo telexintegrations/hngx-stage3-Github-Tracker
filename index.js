@@ -2,13 +2,24 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const axios = require('axios');
-const { Octokit } = require('@octokit/rest');
 const app = express();
 const PORT = process.env.PORT;
 
+let Octokit;
+
+(async () => {
+  const module = await import("@octokit/rest");
+  Octokit = module.Octokit; 
+})();
+
 app.use(bodyParser.json());
 
-const createOctokit = (token) => new Octokit({ auth: token });
+const createOctokit = (token) => {
+  if (!Octokit) {
+    throw new Error("Octokit is not initialized yet. Ensure the import has completed.");
+  }
+  return new Octokit({ auth: token });
+};
 
 app.post('/github-webhook', async (req, res) => {
   console.log('Received webhook:', {
@@ -70,6 +81,11 @@ app.post('/github/tick', async (req, res) => {
 });
 
 async function fetchGitHubUpdates(settings) {
+  if (!Octokit) {
+    console.error("Octokit is not initialized yet.");
+    return [];
+  }
+  
   const octokit = createOctokit(settings.github_token);
   const [owner, repo] = settings.repository_url.split('/').slice(-2);
   const updates = [];
