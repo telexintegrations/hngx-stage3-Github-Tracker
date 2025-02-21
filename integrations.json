@@ -56,7 +56,7 @@
         "default": ""
       }
     ],
-    "tick_url": "http://localhost:3000/github/tick",
-    "target_url": "http://localhost:3000/github-webhook"
+    "tick_url": "https://hngx-stage3-github-tracker-production.up.railway.app/github/tick",
+    "target_url": "https://hngx-stage3-github-tracker-production.up.railway.app/github-webhook"
   }
 }
