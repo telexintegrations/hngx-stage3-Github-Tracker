@@ -15,12 +15,30 @@ let server = null;
 
 app.use(bodyParser.json());
 
+const orgSettings = new Map();
 const createOctokit = (token) => {
   if (!Octokit) {
     throw new Error("Octokit is not initialized yet. Ensure the import has completed.");
   }
   return new Octokit({ auth: token });
 };
+
+app.post('/register-org', (req, res) => {
+  const { org_id, webhook_url, github_token, repository_url, events_to_monitor } = req.body;
+  
+  if (!org_id || !webhook_url || !github_token || !repository_url) {
+    return res.status(400).json({ error: 'Missing required parameters' });
+  }
+  
+  orgSettings.set(org_id, {
+    webhook_url,
+    github_token,
+    repository_url,
+    events_to_monitor: events_to_monitor || 'issues,pull_request,push'
+  });
+  
+  res.json({ success: true });
+});
 
 app.post('/github-webhook', async (req, res) => {
   try {
@@ -31,10 +49,19 @@ app.post('/github-webhook', async (req, res) => {
     const payload = req.body;
     console.log('Settings from payload:', payload.settings);
 
+    const orgName = payload.organization?.login || payload.repository?.owner?.login;
+
+    if (!orgName) {
+      console.error('No organization found in payload');
+      return res.status(400).json({ error: 'Cannot determine organization' });
+    }
     // const { webhook_url } = req.body.settings;
     
-    if (!payload.settings?.webhook_url) {
-      return res.status(400).json({ error: 'Webhook URL not configured' });
+    const settings = orgSettings.get(orgName);
+    
+    if (!settings?.webhook_url) {
+      console.error(`No webhook URL found for organization: ${orgName}`);
+      return res.status(400).json({ error: 'Organization not configured' });
     }
 
     const telexPayload = {
@@ -44,6 +71,8 @@ app.post('/github-webhook', async (req, res) => {
       username: "GitHub"
     };
     
+    console.log(`Sending notification to ${orgName}'s webhook:`, telexPayload);
+
     await axios.post(payload.settings.webhook_url, telexPayload, {
       headers: {
         'Content-Type': 'application/json'
@@ -61,10 +90,16 @@ app.post('/github-webhook', async (req, res) => {
 
 app.post('/github/tick', async (req, res) => {
   try {
-    const { settings } = req.body;
+    const { org_id } = req.body;
     
-    if (!settings.github_token || !settings.repository_url || !settings.webhook_url) {
-      throw new Error('Missing required settings');
+    if (!org_id) {
+      throw new Error('Missing org_id in request');
+    }
+    
+    const settings = orgSettings.get(org_id);
+    
+    if (!settings) {
+      throw new Error(`No settings found for org: ${org_id}`);
     }
     
     const githubData = await fetchGitHubUpdates(settings);
@@ -81,7 +116,7 @@ app.post('/github/tick', async (req, res) => {
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Error processing tick:', error);
-    res.status(500).json({ error: 'Tick processing failed' });
+    res.status(500).json({ error: error.message });
   }
 });
 
