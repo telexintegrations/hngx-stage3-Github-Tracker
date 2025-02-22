@@ -44,12 +44,15 @@ app.post('/github-webhook', async (req, res) => {
   try {
     const eventType = req.headers['x-github-event'];
     const payload = req.body;
-    const settings = req.body.settings
 
-    if (!settings.webhook_url) {
+    const webhookSetting = payload.settings?.find(s => s.label === 'webhook_url');
+    const webhook_url = webhookSetting?.default;
+    
+    if (!webhook_url) {
       console.error('No webhook URL found in settings');
       return res.status(400).json({ error: 'Webhook URL not configured' });
     }
+
 
     const telexPayload = {
       event_name: `GitHub ${eventType}`,
@@ -73,17 +76,28 @@ app.post('/github-webhook', async (req, res) => {
 
 app.post('/github/tick', async (req, res) => {
   try {
-    const { settings } = req.body;
+    const settings = req.body.settings;
     
-    if (!settings || !settings.webhook_url || !settings.github_token || !settings.repository_url) {
+    if (!Array.isArray(settings)) {
+      throw new Error('Settings must be an array');
+    }
+    
+    const settingsObj = {
+      webhook_url: settings.find(s => s.label === 'webhook_url')?.default,
+      github_token: settings.find(s => s.label === 'github_token')?.default,
+      repository_url: settings.find(s => s.label === 'repository_url')?.default,
+      events_to_monitor: settings.find(s => s.label === 'events_to_monitor')?.default
+    };
+    
+    if (!settingsObj.webhook_url || !settingsObj.github_token || !settingsObj.repository_url) {
       console.error('Missing settings:', settings);
       throw new Error('Missing required settings');
     }
     
-    const githubData = await fetchGitHubUpdates(settings);
+    const githubData = await fetchGitHubUpdates(settingsObj);
     
     if (githubData.length > 0) {
-      await axios.post(settings.webhook_url, {
+      await axios.post(settingsObj.webhook_url, {
         event_name: "GitHub Update",
         message: formatUpdateMessage(githubData),
         status: "success",
