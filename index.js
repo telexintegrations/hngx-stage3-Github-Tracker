@@ -90,22 +90,28 @@ app.post('/github/tick', async (req, res) => {
       events_to_monitor: settings.find(s => s.label === 'events_to_monitor')?.default
     };
     console.log("Webhook URL Retrieved:", settingsObj.webhook_url);
-    
+    const webhookUrl = settingsObj.webhook_url?.trim();
     if (!settingsObj.github_token || !settingsObj.repository_url) {
       console.error('Missing settings:', settings);
       throw new Error('Missing required settings');
     }
-    console.log("📡 Sending Webhook to:", settingsObj.webhook_url);
-    if (!settingsObj.webhook_url || typeof settingsObj.webhook_url !== "string") {
-      console.error("❌ Invalid webhook URL:", settingsObj.webhook_url);
+    console.log(" Sending Webhook to:", settingsObj.webhook_url);
+    if (!webhookUrl || typeof webhookUrl !== "string" || !webhookUrl.startsWith("http")) {
+      console.error("Invalid Webhook URL:", webhookUrl);
       return res.status(400).json({ error: "Invalid webhook URL" });
-    }
+  }
 
+  try {
+    new URL(webhookUrl);
+} catch (error) {
+    console.error("Webhook URL is malformed:", webhookUrl);
+    return res.status(400).json({ error: "Webhook URL is malformed" });
+}
     
     const githubData = await fetchGitHubUpdates(settingsObj);
     
     if (githubData.length > 0) {
-      await axios.post(settingsObj.webhook_url, {
+      await axios.post(webhookUrl, {
         event_name: "GitHub Update",
         message: formatUpdateMessage(githubData),
         status: "success",
