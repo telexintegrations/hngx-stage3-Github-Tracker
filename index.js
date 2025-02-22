@@ -87,7 +87,7 @@ app.post('/github/tick', async (req, res) => {
       github_token: settings.find(s => s.label === 'github_token')?.default,
       repository_url: settings.find(s => s.label === 'repository_url')?.default,
       events_to_monitor: settings.find(s => s.label === 'events_to_monitor')?.default
-    };
+    };    
     
     if (!settingsObj.webhook_url || !settingsObj.github_token || !settingsObj.repository_url) {
       console.error('Missing settings:', settings);
@@ -129,6 +129,9 @@ async function fetchGitHubUpdates(settings) {
     } else {
       [owner, repo] = repoUrl.split('/').filter(Boolean);
     }
+    if (repoUrl.includes('.git')) {
+      repoUrl = repoUrl.replace('.git', '');
+  }  
 
     if (!owner || !repo) {
       throw new Error('Invalid repository URL format');
