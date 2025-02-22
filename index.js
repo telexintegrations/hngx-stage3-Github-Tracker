@@ -42,26 +42,13 @@ app.post('/register-org', (req, res) => {
 
 app.post('/github-webhook', async (req, res) => {
   try {
-    console.log('Received webhook payload:', JSON.stringify(req.body, null, 2));
-    console.log('Request headers:', req.headers);
-
     const eventType = req.headers['x-github-event'];
     const payload = req.body;
-    console.log('Settings from payload:', payload.settings);
+    const settings = req.body.settings
 
-    const orgName = payload.organization?.login || payload.repository?.owner?.login;
-
-    if (!orgName) {
-      console.error('No organization found in payload');
-      return res.status(400).json({ error: 'Cannot determine organization' });
-    }
-    // const { webhook_url } = req.body.settings;
-    
-    const settings = orgSettings.get(orgName);
-    
-    if (!settings?.webhook_url) {
-      console.error(`No webhook URL found for organization: ${orgName}`);
-      return res.status(400).json({ error: 'Organization not configured' });
+    if (!settings.webhook_url) {
+      console.error('No webhook URL found in settings');
+      return res.status(400).json({ error: 'Webhook URL not configured' });
     }
 
     const telexPayload = {
@@ -70,8 +57,6 @@ app.post('/github-webhook', async (req, res) => {
       status: "success",
       username: "GitHub"
     };
-    
-    console.log(`Sending notification to ${orgName}'s webhook:`, telexPayload);
 
     await axios.post(payload.settings.webhook_url, telexPayload, {
       headers: {
@@ -79,27 +64,20 @@ app.post('/github-webhook', async (req, res) => {
       }
     });
     
-    console.log('Event processed:', telexPayload);
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Full error:', error);
-    console.error('Error response data:', error.response?.data);
     res.status(500).json({ error: 'Failed to process webhook' });
   }
 });
 
 app.post('/github/tick', async (req, res) => {
   try {
-    const { org_id } = req.body;
+    const { settings } = req.body;
     
-    if (!org_id) {
-      throw new Error('Missing org_id in request');
-    }
-    
-    const settings = orgSettings.get(org_id);
-    
-    if (!settings) {
-      throw new Error(`No settings found for org: ${org_id}`);
+    if (!settings || !settings.webhook_url || !settings.github_token || !settings.repository_url) {
+      console.error('Missing settings:', settings);
+      throw new Error('Missing required settings');
     }
     
     const githubData = await fetchGitHubUpdates(settings);
