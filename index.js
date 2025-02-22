@@ -56,11 +56,12 @@ app.post("/register-org", (req, res) => {
 app.post("/github-webhook", async (req, res) => {
   try {
     console.log("Incoming Webhook Event:", req.headers["x-github-event"]);
-    const eventType = req.headers["x-github-event"];
+    const eventType = req.headers["x-github-event"] || "unknown";
+    console.log("Incoming Webhook Event:", eventType);
     const payload = req.body;
 
     if (!payload.repository || !payload.repository.full_name) {
-      console.error("Repository information missing in payload.");
+      console.error("Repository information missing in payload:", JSON.stringify(payload, null, 2));
       return res.status(400).json({ error: "Repository information missing." });
     }
 
@@ -85,12 +86,16 @@ app.post("/github-webhook", async (req, res) => {
       status: "success",
       username: "GitHub",
     };
-
-    await axios.post(payload.settings.webhook_url, telexPayload, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    try {
+      const response = await axios.post(payload.settings.webhook_url, telexPayload, {
+          headers: { "Content-Type": "application/json" },
+      });
+    
+      console.log("Webhook sent successfully:", response.data ?? "No response data");
+    
+    } catch (error) {
+      console.error("Axios Webhook Request Failed:", error.response?.data ?? error.message);
+    }
 
     res.status(200).json({ success: true });
   } catch (error) {
