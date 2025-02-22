@@ -95,10 +95,12 @@ app.post('/github/tick', async (req, res) => {
       console.error('Missing settings:', settings);
       throw new Error('Missing required settings');
     }
-    if (!settingsObj.webhook_url) {
-      console.error("Error: Webhook URL is missing!");
-      return res.status(400).json({ error: "Webhook URL not configured" });
-  }
+    console.log("📡 Sending Webhook to:", settingsObj.webhook_url);
+    if (!settingsObj.webhook_url || typeof settingsObj.webhook_url !== "string") {
+      console.error("❌ Invalid webhook URL:", settingsObj.webhook_url);
+      return res.status(400).json({ error: "Invalid webhook URL" });
+    }
+
     
     const githubData = await fetchGitHubUpdates(settingsObj);
     
@@ -108,7 +110,7 @@ app.post('/github/tick', async (req, res) => {
         message: formatUpdateMessage(githubData),
         status: "success",
         username: "GitHub"
-      });
+      });      
     }
     
     res.status(200).json({ success: true });
@@ -127,7 +129,7 @@ async function fetchGitHubUpdates(settings) {
   const octokit = createOctokit(settings.github_token);
   let owner, repo;
   try {
-    const repoUrl = settings.repository_url;
+    let repoUrl = settings.repository_url;
     if (repoUrl.includes('github.com')) {
       const urlParts = new URL(repoUrl).pathname.split('/').filter(Boolean);
       owner = urlParts[0];
@@ -136,7 +138,7 @@ async function fetchGitHubUpdates(settings) {
       [owner, repo] = repoUrl.split('/').filter(Boolean);
     }
     if (repoUrl.includes('.git')) {
-    repoUrl = repoUrl.replace('.git', '');
+      repoUrl = repoUrl.replace('.git', '');
   }
 
     if (!owner || !repo) {
