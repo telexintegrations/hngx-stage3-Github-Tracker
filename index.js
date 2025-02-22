@@ -100,17 +100,17 @@ app.post("/github-webhook", async (req, res) => {
 
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error("Full error:", error);
-    res.status(500).json({ error: "Failed to process webhook" });
+    console.error("Full error:", error)
+    res.status(500).json({ error: "Failed to process webhook" })
   }
-});
+})
 
 app.post("/github/tick", async (req, res) => {
   try {
-    const settings = req.body.settings;
+    const settings = req.body.settings
 
     if (!Array.isArray(settings)) {
-      throw new Error("Settings must be an array");
+      throw new Error("Settings must be an array")
     }
 
     const settingsObj = {
@@ -123,33 +123,33 @@ app.post("/github/tick", async (req, res) => {
         ?.default,
       events_to_monitor: settings.find((s) => s.label === "events_to_monitor")
         ?.default,
-    };
-    console.log("Webhook URL Retrieved:", settingsObj.webhook_url);
-    const webhookUrl = settingsObj.webhook_url?.trim();
-    if (!settingsObj.github_token || !settingsObj.repository_url) {
-      console.error("Missing settings:", settings);
-      throw new Error("Missing required settings");
     }
-    console.log(" Sending Webhook to:", settingsObj.webhook_url);
-    console.log("Webhook URL Before Sending:", webhookUrl);
+    console.log("Webhook URL Retrieved:", settingsObj.webhook_url)
+    const webhookUrl = settingsObj.webhook_url?.trim()
+    if (!settingsObj.github_token || !settingsObj.repository_url) {
+      console.error("Missing settings:", settings)
+      throw new Error("Missing required settings")
+    }
+    console.log(" Sending Webhook to:", settingsObj.webhook_url)
+    console.log("Webhook URL Before Sending:", webhookUrl)
 
     if (
       !webhookUrl ||
       typeof webhookUrl !== "string" ||
       !webhookUrl.startsWith("http")
     ) {
-      console.error("Invalid Webhook URL:", webhookUrl);
-      return res.status(400).json({ error: "Invalid webhook URL" });
+      console.error("Invalid Webhook URL:", webhookUrl)
+      return res.status(400).json({ error: "Invalid webhook URL" })
     }
 
     try {
-      new URL(webhookUrl);
+      new URL(webhookUrl)
     } catch (error) {
-      console.error("Webhook URL is malformed:", webhookUrl);
-      return res.status(400).json({ error: "Webhook URL is malformed" });
+      console.error("Webhook URL is malformed:", webhookUrl)
+      return res.status(400).json({ error: "Webhook URL is malformed" })
     }
 
-    const githubData = await fetchGitHubUpdates(settingsObj);
+    const githubData = await fetchGitHubUpdates(settingsObj)
 
     if (githubData.length > 0) {
       try {
@@ -164,54 +164,54 @@ app.post("/github/tick", async (req, res) => {
           .then((response) =>
             console.log("Webhook sent successfully:", response.data)
           )
-          .catch((error) => console.error("Webhook Error:", error));
-        console.log("Webhook Successfully Sent!", response.data);
+          .catch((error) => console.error("Webhook Error:", error))
+        console.log("Webhook Successfully Sent!", response.data)
       } catch (error) {
         console.error(
           "Axios Webhook Request Failed:",
           error.response?.data || error.message
-        );
+        )
       }
     }
 
-    res.status(200).json({ success: true });
+    res.status(200).json({ success: true })
   } catch (error) {
-    console.error("Error processing tick:", error);
-    res.status(500).json({ error: error.message });
+    console.error("Error processing tick:", error)
+    res.status(500).json({ error: error.message })
   }
-});
+})
 
 async function fetchGitHubUpdates(settings) {
   if (!Octokit) {
-    console.error("Octokit is not initialized yet.");
-    return [];
+    console.error("Octokit is not initialized yet.")
+    return []
   }
 
-  const octokit = createOctokit(settings.github_token);
-  let owner, repo;
+  const octokit = createOctokit(settings.github_token)
+  let owner, repo
   try {
-    let repoUrl = settings.repository_url;
+    let repoUrl = settings.repository_url
     if (repoUrl.includes("github.com")) {
-      const urlParts = new URL(repoUrl).pathname.split("/").filter(Boolean);
-      owner = urlParts[0];
-      repo = urlParts[1];
+      const urlParts = new URL(repoUrl).pathname.split("/").filter(Boolean)
+      owner = urlParts[0]
+      repo = urlParts[1]
     } else {
-      [owner, repo] = repoUrl.split("/").filter(Boolean);
+      [owner, repo] = repoUrl.split("/").filter(Boolean)
     }
     if (repoUrl.includes(".git")) {
-      repoUrl = repoUrl.replace(".git", "");
+      repoUrl = repoUrl.replace(".git", "")
     }
 
     if (!owner || !repo) {
-      throw new Error("Invalid repository URL format");
+      throw new Error("Invalid repository URL format")
     }
   } catch (error) {
-    console.error("Error parsing repository URL:", error);
-    return [];
+    console.error("Error parsing repository URL:", error)
+    return []
   }
-  const updates = [];
+  const updates = []
 
-  const eventsToMonitor = settings.events_to_monitor.split(",");
+  const eventsToMonitor = settings.events_to_monitor.split(",")
 
   try {
     if (eventsToMonitor.includes("issues")) {
@@ -221,7 +221,7 @@ async function fetchGitHubUpdates(settings) {
         state: "all",
         per_page: 5,
         sort: "updated",
-      });
+      })
       updates.push(
         ...issues.map((issue) => ({
           type: "issue",
@@ -230,7 +230,7 @@ async function fetchGitHubUpdates(settings) {
           url: issue.html_url,
           updated_at: issue.updated_at,
         }))
-      );
+      )
     }
 
     if (eventsToMonitor.includes("pull_request")) {
@@ -240,7 +240,7 @@ async function fetchGitHubUpdates(settings) {
         state: "all",
         per_page: 5,
         sort: "updated",
-      });
+      })
       updates.push(
         ...prs.map((pr) => ({
           type: "pull_request",
@@ -249,7 +249,7 @@ async function fetchGitHubUpdates(settings) {
           url: pr.html_url,
           updated_at: pr.updated_at,
         }))
-      );
+      )
     }
 
     if (eventsToMonitor.includes("push")) {
@@ -257,7 +257,7 @@ async function fetchGitHubUpdates(settings) {
         owner,
         repo,
         per_page: 5,
-      });
+      })
       updates.push(
         ...commits.map((commit) => ({
           type: "commit",
@@ -266,15 +266,15 @@ async function fetchGitHubUpdates(settings) {
           url: commit.html_url,
           updated_at: commit.commit.author.date,
         }))
-      );
+      )
     }
 
     return updates
       .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-      .slice(0, 5);
+      .slice(0, 5)
   } catch (error) {
-    console.error("Error fetching GitHub updates:", error);
-    return [];
+    console.error("Error fetching GitHub updates:", error)
+    return []
   }
 }
 
