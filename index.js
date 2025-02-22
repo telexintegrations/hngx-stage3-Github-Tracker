@@ -71,12 +71,12 @@ app.post("/github-webhook", async (req, res) => {
 
     const repoName = payload.repository.full_name;
     const webhookSetting = orgSettings.get(repoName);
-    const webhook_url = webhookSetting?.default;
+    // const webhook_url = webhookSetting?.default;
 
-    if (!webhook_url) {
-      console.error("No webhook URL found in settings");
-      return res.status(400).json({ error: "Webhook URL not configured" });
-    }
+    // if (!webhook_url) {
+    //   console.error("No webhook URL found in settings");
+    //   return res.status(400).json({ error: "Webhook URL not configured" });
+    // }
 
     if (!webhookSetting || !webhookSetting.webhook_url) {
       console.error("No webhook URL found for:", repoName);
@@ -92,13 +92,14 @@ app.post("/github-webhook", async (req, res) => {
     };
     try {
       const response = await axios.post(
-        payload.settings.webhook_url,
+        webhookSetting.webhook_url,
         telexPayload,
         {
           headers: { "Content-Type": "application/json" },
         }
       );
 
+      res.status(200).json({ success: true });
       console.log(
         "Webhook sent successfully:",
         response.data ?? "No response data"
