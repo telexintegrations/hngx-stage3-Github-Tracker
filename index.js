@@ -23,10 +23,6 @@ const createOctokit = (token) => {
 };
 
 app.post('/github-webhook', async (req, res) => {
-  console.log('Received webhook:', {
-    headers: req.headers,
-    body: req.body
-  });
   try {
     const eventType = req.headers['x-github-event'];
     const signature = req.headers['x-hub-signature-256'];
@@ -72,9 +68,6 @@ function verifyWebhookSignature(payload, signature, secret) {
 }
 
 app.post('/github/tick', async (req, res) => {
-  console.log('Received tick:', {
-    body: req.body
-  });
   try {
     const { return_url, settings, organization_id  } = req.body;
     
