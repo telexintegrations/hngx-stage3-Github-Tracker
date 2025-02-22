@@ -224,9 +224,9 @@ async function fetchGitHubUpdates(settings) {
   }
   const eventsToMonitor = settings.events_to_monitor.split(",");
   let latestEvent = null;
+  const allUpdates = [];
 
   try {
-    const allUpdates = [];
     if (eventsToMonitor.includes("issues")) {
       const { data: issues } = await octokit.issues.listForRepo({
         owner,
@@ -265,7 +265,7 @@ async function fetchGitHubUpdates(settings) {
       }
     }
 
-    if (eventsToMonitor.includes("push") && !latestEvent) {
+    if (eventsToMonitor.includes("push")) {
       const { data: commits } = await octokit.repos.listCommits({
         owner,
         repo,
@@ -294,7 +294,7 @@ async function fetchGitHubUpdates(settings) {
       lastUpdate.url === latestEvent.url &&
       lastUpdate.updated_at >= latestEvent.updated_at
     ) {
-      console.log("⏳ No new updates since last event.");
+      console.log("No new updates since last event.");
       return [];
     }
 
