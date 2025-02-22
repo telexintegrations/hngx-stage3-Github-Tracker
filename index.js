@@ -204,7 +204,7 @@ async function fetchGitHubUpdates(settings) {
     console.error("Error parsing repository URL:", error);
     return [];
   }
-  const updates = null;
+  let updates = null;
 
   const eventsToMonitor = settings.events_to_monitor.split(",");
 
