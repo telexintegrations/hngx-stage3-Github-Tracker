@@ -119,7 +119,24 @@ async function fetchGitHubUpdates(settings) {
   }
   
   const octokit = createOctokit(settings.github_token);
-  const [owner, repo] = settings.repository_url.split('/').slice(-2);
+  let owner, repo;
+  try {
+    const repoUrl = settings.repository_url;
+    if (repoUrl.includes('github.com')) {
+      const urlParts = new URL(repoUrl).pathname.split('/').filter(Boolean);
+      owner = urlParts[0];
+      repo = urlParts[1];
+    } else {
+      [owner, repo] = repoUrl.split('/').filter(Boolean);
+    }
+
+    if (!owner || !repo) {
+      throw new Error('Invalid repository URL format');
+    }
+  } catch (error) {
+    console.error('Error parsing repository URL:', error);
+    return [];
+  }
   const updates = [];
   
   const eventsToMonitor = settings.events_to_monitor.split(',');
