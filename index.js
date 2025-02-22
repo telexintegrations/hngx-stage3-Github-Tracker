@@ -27,7 +27,7 @@ app.post('/register-org', (req, res) => {
   const { org_id, webhook_url, github_token, repository_url, events_to_monitor } = req.body;
   
   if (!org_id || !webhook_url || !github_token || !repository_url) {
-    return res.status(400).json({ error: 'Missing required parameters' });
+    return res.status(400).json({ error: 'Missing required parameters. Ensure webhook_url is set.' });
   }
   
   orgSettings.set(org_id, {
@@ -37,7 +37,7 @@ app.post('/register-org', (req, res) => {
     events_to_monitor: events_to_monitor || 'issues,pull_request,push'
   });
   
-  res.json({ success: true });
+  res.json({ success: true, message: 'Organization registered successfully.' });
 });
 
 app.post('/github-webhook', async (req, res) => {
@@ -84,17 +84,21 @@ app.post('/github/tick', async (req, res) => {
     
     const settingsObj = {
       webhook_url: settings.find(s => s.label === 'webhook_url')?.default 
-      || settings.find(s => s.label === 'return_url')?.default,
+      || settings.find(s => s.label === 'return_url')?.default || req.body.webhook_url,
       github_token: settings.find(s => s.label === 'github_token')?.default,
       repository_url: settings.find(s => s.label === 'repository_url')?.default,
       events_to_monitor: settings.find(s => s.label === 'events_to_monitor')?.default
     };
     console.log("Webhook URL Retrieved:", settingsObj.webhook_url);
     
-    if (!settingsObj.webhook_url || !settingsObj.github_token || !settingsObj.repository_url) {
+    if (!settingsObj.github_token || !settingsObj.repository_url) {
       console.error('Missing settings:', settings);
       throw new Error('Missing required settings');
     }
+    if (!settingsObj.webhook_url) {
+      console.error("Error: Webhook URL is missing!");
+      return res.status(400).json({ error: "Webhook URL not configured" });
+  }
     
     const githubData = await fetchGitHubUpdates(settingsObj);
     
@@ -132,8 +136,8 @@ async function fetchGitHubUpdates(settings) {
       [owner, repo] = repoUrl.split('/').filter(Boolean);
     }
     if (repoUrl.includes('.git')) {
-      repoUrl = repoUrl.replace('.git', '');
-  }  
+    repoUrl = repoUrl.replace('.git', '');
+  }
 
     if (!owner || !repo) {
       throw new Error('Invalid repository URL format');
