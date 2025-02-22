@@ -54,6 +54,13 @@
         "required": true,
         "description": "GitHub Personal Access Token",
         "default": ""
+      },
+      {
+        "label": "webhook_url",
+        "type": "text",
+        "required": true,
+        "description": "Webhook URL to receive GitHub notifications",
+        "default": ""
       }
     ],
     "tick_url": "https://hngx-stage3-github-tracker-production.up.railway.app/github/tick",

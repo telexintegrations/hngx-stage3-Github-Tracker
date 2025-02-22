@@ -1,7 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
-const crypto = require('crypto');
 const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT;
@@ -25,35 +24,27 @@ const createOctokit = (token) => {
 app.post('/github-webhook', async (req, res) => {
   try {
     const eventType = req.headers['x-github-event'];
-    const signature = req.headers['x-hub-signature-256'];
     const payload = req.body;
+    const { webhook_url } = req.body.settings;
     
-    const orgSettings = await getOrgSettingsForRepo(payload.repository.full_name);
-    
-    if (!orgSettings) {
-      console.log(`No organization found for repository: ${payload.repository.full_name}`);
-      return res.status(200).json({ message: 'Repository not configured' });
-    }
-
-    if (!verifyWebhookSignature(req.body, signature, orgSettings.webhookSecret)) {
-      return res.status(401).json({ error: 'Invalid signature' });
+    if (!webhook_url) {
+      return res.status(400).json({ error: 'Webhook URL not configured' });
     }
 
     const telexPayload = {
       event_name: `GitHub ${eventType}`,
       message: formatGitHubMessage(eventType, payload),
       status: "success",
-      username: "GitHub",
-      organization_id: orgSettings.organizationId
+      username: "GitHub"
     };
     
-    await axios.post(orgSettings.telexWebhookUrl, telexPayload, {
+    await axios.post(webhook_url, telexPayload, {
       headers: {
         'Content-Type': 'application/json'
       }
     });
     
-    console.log('Event processed:', orgSettings.organizationId);
+    console.log('Event processed:', telexPayload);
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Error:', error);
@@ -61,29 +52,22 @@ app.post('/github-webhook', async (req, res) => {
   }
 });
 
-function verifyWebhookSignature(payload, signature, secret) {
-  const hmac = crypto.createHmac('sha256', secret);
-  const digest = 'sha256=' + hmac.update(JSON.stringify(payload)).digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(signature));
-}
-
 app.post('/github/tick', async (req, res) => {
   try {
-    const { return_url, settings, organization_id  } = req.body;
+    const { settings } = req.body;
     
-    if (!settings.github_token || !settings.repository_url) {
+    if (!settings.github_token || !settings.repository_url || !settings.webhook_url) {
       throw new Error('Missing required settings');
     }
     
     const githubData = await fetchGitHubUpdates(settings);
     
     if (githubData.length > 0) {
-      await axios.post(return_url, {
+      await axios.post(settings.webhook_url, {
         event_name: "GitHub Update",
         message: formatUpdateMessage(githubData),
         status: "success",
-        username: "GitHub",
-        organization_id: organization_id
+        username: "GitHub"
       });
     }
     
