@@ -24,11 +24,16 @@ const createOctokit = (token) => {
 
 app.post('/github-webhook', async (req, res) => {
   try {
+    console.log('Received webhook payload:', JSON.stringify(req.body, null, 2));
+    console.log('Request headers:', req.headers);
+
     const eventType = req.headers['x-github-event'];
     const payload = req.body;
-    const { webhook_url } = req.body.settings;
+    console.log('Settings from payload:', payload.settings);
+
+    // const { webhook_url } = req.body.settings;
     
-    if (!webhook_url) {
+    if (!payload.settings?.webhook_url) {
       return res.status(400).json({ error: 'Webhook URL not configured' });
     }
 
@@ -39,7 +44,7 @@ app.post('/github-webhook', async (req, res) => {
       username: "GitHub"
     };
     
-    await axios.post(webhook_url, telexPayload, {
+    await axios.post(payload.settings.webhook_url, telexPayload, {
       headers: {
         'Content-Type': 'application/json'
       }
@@ -48,7 +53,8 @@ app.post('/github-webhook', async (req, res) => {
     console.log('Event processed:', telexPayload);
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Full error:', error);
+    console.error('Error response data:', error.response?.data);
     res.status(500).json({ error: 'Failed to process webhook' });
   }
 });
