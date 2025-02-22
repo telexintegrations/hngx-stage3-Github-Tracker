@@ -83,11 +83,13 @@ app.post('/github/tick', async (req, res) => {
     }
     
     const settingsObj = {
-      webhook_url: settings.find(s => s.label === 'webhook_url')?.default,
+      webhook_url: settings.find(s => s.label === 'webhook_url')?.default 
+      || settings.find(s => s.label === 'return_url')?.default,
       github_token: settings.find(s => s.label === 'github_token')?.default,
       repository_url: settings.find(s => s.label === 'repository_url')?.default,
       events_to_monitor: settings.find(s => s.label === 'events_to_monitor')?.default
-    };    
+    };
+    console.log("Webhook URL Retrieved:", settingsObj.webhook_url);
     
     if (!settingsObj.webhook_url || !settingsObj.github_token || !settingsObj.repository_url) {
       console.error('Missing settings:', settings);
