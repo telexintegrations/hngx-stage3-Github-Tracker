@@ -35,11 +35,9 @@ app.post("/register-org", (req, res) => {
   } = req.body;
 
   if (!org_id || !webhook_url || !github_token || !repository_url) {
-    return res
-      .status(400)
-      .json({
-        error: "Missing required parameters. Ensure webhook_url is set.",
-      });
+    return res.status(400).json({
+      error: "Missing required parameters. Ensure webhook_url is set.",
+    });
   }
 
   orgSettings.set(org_id, {
@@ -57,18 +55,17 @@ app.post("/register-org", (req, res) => {
 
 app.post("/github-webhook", async (req, res) => {
   try {
-    console.log("Incoming Webhook Event:", req.headers['x-github-event']);
-
+    console.log("Incoming Webhook Event:", req.headers["x-github-event"]);
     const eventType = req.headers["x-github-event"];
     const payload = req.body;
 
     if (!payload.repository || !payload.repository.full_name) {
       console.error("Repository information missing in payload.");
       return res.status(400).json({ error: "Repository information missing." });
-  }
+    }
 
-    
-  const webhookSetting = orgSettings.get(repoName);
+    const repoName = payload.repository.full_name;
+    const webhookSetting = orgSettings.get(repoName);
     const webhook_url = webhookSetting?.default;
 
     if (!webhook_url) {
@@ -76,13 +73,10 @@ app.post("/github-webhook", async (req, res) => {
       return res.status(400).json({ error: "Webhook URL not configured" });
     }
 
-    const repoName = payload.repository.full_name;
-
     if (!webhookSetting || !webhookSetting.webhook_url) {
       console.error("No webhook URL found for:", repoName);
       return res.status(400).json({ error: "Webhook URL not configured" });
     }
-
     console.log("Sending Webhook to:", webhookSetting.webhook_url);
 
     const telexPayload = {
@@ -191,15 +185,16 @@ async function fetchGitHubUpdates(settings) {
   let owner, repo;
   try {
     let repoUrl = settings.repository_url;
+    if (repoUrl.includes(".git")) {
+      repoUrl = repoUrl.replace(".git", "");
+    }
+
     if (repoUrl.includes("github.com")) {
       const urlParts = new URL(repoUrl).pathname.split("/").filter(Boolean);
       owner = urlParts[0];
       repo = urlParts[1];
     } else {
       [owner, repo] = repoUrl.split("/").filter(Boolean);
-    }
-    if (repoUrl.includes(".git")) {
-      repoUrl = repoUrl.replace(".git", "");
     }
 
     if (!owner || !repo) {
@@ -223,13 +218,13 @@ async function fetchGitHubUpdates(settings) {
         sort: "updated",
       });
       if (issues.length > 0) {
-          updates = {
-              type: 'issue',
-              title: issues[0].title,
-              state: issues[0].state,
-              url: issues[0].html_url,
-              updated_at: issues[0].updated_at
-          };
+        updates = {
+          type: "issue",
+          title: issues[0].title,
+          state: issues[0].state,
+          url: issues[0].html_url,
+          updated_at: issues[0].updated_at,
+        };
       }
     }
 
@@ -242,13 +237,13 @@ async function fetchGitHubUpdates(settings) {
         sort: "updated",
       });
       if (prs.length > 0) {
-          updates = {
-              type: 'pull_request',
-              title: prs[0].title,
-              state: prs[0].state,
-              url: prs[0].html_url,
-              updated_at: prs[0].updated_at
-          };
+        updates = {
+          type: "pull_request",
+          title: prs[0].title,
+          state: prs[0].state,
+          url: prs[0].html_url,
+          updated_at: prs[0].updated_at,
+        };
       }
     }
 
@@ -259,17 +254,17 @@ async function fetchGitHubUpdates(settings) {
         per_page: 1,
       });
       if (commits.length > 0) {
-          updates = {
-              type: 'commit',
-              message: commits[0].commit.message,
-              author: commits[0].commit.author.name,
-              url: commits[0].html_url,
-              updated_at: commits[0].commit.author.date
-          };
+        updates = {
+          type: "commit",
+          message: commits[0].commit.message,
+          author: commits[0].commit.author.name,
+          url: commits[0].html_url,
+          updated_at: commits[0].commit.author.date,
+        };
       }
     }
 
-    return latestUpdate ? [latestUpdate] : [];
+    return updates ? [updates] : [];
   } catch (error) {
     console.error("Error fetching GitHub updates:", error);
     return [];
