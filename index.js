@@ -209,7 +209,7 @@ async function fetchGitHubUpdates(settings) {
     console.error("Error parsing repository URL:", error);
     return [];
   }
-  const updates = [];
+  const updates = null;
 
   const eventsToMonitor = settings.events_to_monitor.split(",");
 
@@ -219,59 +219,57 @@ async function fetchGitHubUpdates(settings) {
         owner,
         repo,
         state: "all",
-        per_page: 5,
+        per_page: 1,
         sort: "updated",
       });
-      updates.push(
-        ...issues.map((issue) => ({
-          type: "issue",
-          title: issue.title,
-          state: issue.state,
-          url: issue.html_url,
-          updated_at: issue.updated_at,
-        }))
-      );
+      if (issues.length > 0) {
+          updates = {
+              type: 'issue',
+              title: issues[0].title,
+              state: issues[0].state,
+              url: issues[0].html_url,
+              updated_at: issues[0].updated_at
+          };
+      }
     }
 
-    if (eventsToMonitor.includes("pull_request")) {
+    if (eventsToMonitor.includes("pull_request") && !updates) {
       const { data: prs } = await octokit.pulls.list({
         owner,
         repo,
         state: "all",
-        per_page: 5,
+        per_page: 1,
         sort: "updated",
       });
-      updates.push(
-        ...prs.map((pr) => ({
-          type: "pull_request",
-          title: pr.title,
-          state: pr.state,
-          url: pr.html_url,
-          updated_at: pr.updated_at,
-        }))
-      );
+      if (prs.length > 0) {
+          updates = {
+              type: 'pull_request',
+              title: prs[0].title,
+              state: prs[0].state,
+              url: prs[0].html_url,
+              updated_at: prs[0].updated_at
+          };
+      }
     }
 
-    if (eventsToMonitor.includes("push")) {
+    if (eventsToMonitor.includes("push") && !updates) {
       const { data: commits } = await octokit.repos.listCommits({
         owner,
         repo,
-        per_page: 5,
+        per_page: 1,
       });
-      updates.push(
-        ...commits.map((commit) => ({
-          type: "commit",
-          message: commit.commit.message,
-          author: commit.commit.author.name,
-          url: commit.html_url,
-          updated_at: commit.commit.author.date,
-        }))
-      );
+      if (commits.length > 0) {
+          updates = {
+              type: 'commit',
+              message: commits[0].commit.message,
+              author: commits[0].commit.author.name,
+              url: commits[0].html_url,
+              updated_at: commits[0].commit.author.date
+          };
+      }
     }
 
-    return updates
-      .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-      .slice(0, 5);
+    return latestUpdate ? [latestUpdate] : [];
   } catch (error) {
     console.error("Error fetching GitHub updates:", error);
     return [];
