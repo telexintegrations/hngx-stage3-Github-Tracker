@@ -265,7 +265,7 @@ async function fetchGitHubUpdates(settings) {
       }
     }
 
-    if (eventsToMonitor.includes("push") && !updates) {
+    if (eventsToMonitor.includes("push") && !latestEvent) {
       const { data: commits } = await octokit.repos.listCommits({
         owner,
         repo,
@@ -335,10 +335,10 @@ function formatGitHubMessage(eventType, payload) {
   }
 }
 
-function formatUpdateMessage(updates) {
-  if (updates.length === 0) return "No recent GitHub activity";
+function formatUpdateMessage(latestEvent) {
+  if (latestEvent.length === 0) return "No recent GitHub activity";
 
-  const messages = updates
+  const messages = latestEvent
     .map((update) => {
       switch (update.type) {
         case "issue":
