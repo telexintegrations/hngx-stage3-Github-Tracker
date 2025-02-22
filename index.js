@@ -49,23 +49,41 @@ app.post("/register-org", (req, res) => {
     events_to_monitor: events_to_monitor || "issues,pull_request,push",
   });
 
+  console.log("Organization Registered:", org_id);
+  console.log("Webhook URL Stored:", webhook_url);
+
   res.json({ success: true, message: "Organization registered successfully." });
 });
 
 app.post("/github-webhook", async (req, res) => {
   try {
+    console.log("Incoming Webhook Event:", req.headers['x-github-event']);
+
     const eventType = req.headers["x-github-event"];
     const payload = req.body;
 
-    const webhookSetting = payload.settings?.find(
-      (s) => s.label === "webhook_url"
-    );
+    if (!payload.repository || !payload.repository.full_name) {
+      console.error("Repository information missing in payload.");
+      return res.status(400).json({ error: "Repository information missing." });
+  }
+
+    
+  const webhookSetting = orgSettings.get(repoName);
     const webhook_url = webhookSetting?.default;
 
     if (!webhook_url) {
       console.error("No webhook URL found in settings");
       return res.status(400).json({ error: "Webhook URL not configured" });
     }
+
+    const repoName = payload.repository.full_name;
+
+    if (!webhookSetting || !webhookSetting.webhook_url) {
+      console.error("No webhook URL found for:", repoName);
+      return res.status(400).json({ error: "Webhook URL not configured" });
+    }
+
+    console.log("Sending Webhook to:", webhookSetting.webhook_url);
 
     const telexPayload = {
       event_name: `GitHub ${eventType}`,
