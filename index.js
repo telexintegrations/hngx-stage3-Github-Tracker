@@ -24,6 +24,7 @@ const createOctokit = (token) => {
   }
   return new Octokit({ auth: token });
 };
+const lastSentUpdate = new Map();
 
 app.post("/register-org", (req, res) => {
   const {
@@ -61,7 +62,10 @@ app.post("/github-webhook", async (req, res) => {
     const payload = req.body;
 
     if (!payload.repository || !payload.repository.full_name) {
-      console.error("Repository information missing in payload:", JSON.stringify(payload, null, 2));
+      console.error(
+        "Repository information missing in payload:",
+        JSON.stringify(payload, null, 2)
+      );
       return res.status(400).json({ error: "Repository information missing." });
     }
 
@@ -87,14 +91,23 @@ app.post("/github-webhook", async (req, res) => {
       username: "GitHub",
     };
     try {
-      const response = await axios.post(payload.settings.webhook_url, telexPayload, {
+      const response = await axios.post(
+        payload.settings.webhook_url,
+        telexPayload,
+        {
           headers: { "Content-Type": "application/json" },
-      });
-    
-      console.log("Webhook sent successfully:", response.data ?? "No response data");
-    
+        }
+      );
+
+      console.log(
+        "Webhook sent successfully:",
+        response.data ?? "No response data"
+      );
     } catch (error) {
-      console.error("Axios Webhook Request Failed:", error.response?.data ?? error.message);
+      console.error(
+        "Axios Webhook Request Failed:",
+        error.response?.data ?? error.message
+      );
     }
 
     res.status(200).json({ success: true });
@@ -209,46 +222,46 @@ async function fetchGitHubUpdates(settings) {
     console.error("Error parsing repository URL:", error);
     return [];
   }
-  let updates = null;
-
   const eventsToMonitor = settings.events_to_monitor.split(",");
+  let latestEvent = null;
 
   try {
+    const allUpdates = [];
     if (eventsToMonitor.includes("issues")) {
       const { data: issues } = await octokit.issues.listForRepo({
         owner,
         repo,
         state: "all",
-        per_page: 1,
+        per_page: 3,
         sort: "updated",
       });
-      if (issues.length > 0) {
-        updates = {
+      for (const issue of issues) {
+        allUpdates.push({
           type: "issue",
-          title: issues[0].title,
-          state: issues[0].state,
-          url: issues[0].html_url,
-          updated_at: issues[0].updated_at,
-        };
+          title: issue.title,
+          state: issue.state,
+          url: issue.html_url,
+          updated_at: new Date(issue.updated_at),
+        });
       }
     }
 
-    if (eventsToMonitor.includes("pull_request") && !updates) {
+    if (eventsToMonitor.includes("pull_request")) {
       const { data: prs } = await octokit.pulls.list({
         owner,
         repo,
         state: "all",
-        per_page: 1,
+        per_page: 3,
         sort: "updated",
       });
-      if (prs.length > 0) {
-        updates = {
+      for (const pr of prs) {
+        allUpdates.push({
           type: "pull_request",
-          title: prs[0].title,
-          state: prs[0].state,
-          url: prs[0].html_url,
-          updated_at: prs[0].updated_at,
-        };
+          title: pr.title,
+          state: pr.state,
+          url: pr.html_url,
+          updated_at: new Date(pr.updated_at),
+        });
       }
     }
 
@@ -256,20 +269,38 @@ async function fetchGitHubUpdates(settings) {
       const { data: commits } = await octokit.repos.listCommits({
         owner,
         repo,
-        per_page: 1,
+        per_page: 3,
       });
-      if (commits.length > 0) {
-        updates = {
+      for (const commit of commits) {
+        allUpdates.push({
           type: "commit",
-          message: commits[0].commit.message,
-          author: commits[0].commit.author.name,
-          url: commits[0].html_url,
-          updated_at: commits[0].commit.author.date,
-        };
+          message: commit.commit.message,
+          author: commit.commit.author.name,
+          url: commit.html_url,
+          updated_at: new Date(commit.commit.author.date),
+        });
       }
     }
 
-    return updates ? [updates] : [];
+    if (allUpdates.length === 0) {
+      return [];
+    }
+    allUpdates.sort((a, b) => b.updated_at - a.updated_at);
+    latestEvent = allUpdates[0];
+
+    const lastUpdate = lastSentUpdate.get(`${owner}/${repo}`);
+    if (
+      lastUpdate &&
+      lastUpdate.url === latestEvent.url &&
+      lastUpdate.updated_at >= latestEvent.updated_at
+    ) {
+      console.log("⏳ No new updates since last event.");
+      return [];
+    }
+
+    lastSentUpdate.set(`${owner}/${repo}`, latestEvent);
+
+    return [latestEvent];
   } catch (error) {
     console.error("Error fetching GitHub updates:", error);
     return [];
