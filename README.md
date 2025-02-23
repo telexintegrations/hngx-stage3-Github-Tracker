@@ -1,31 +1,29 @@
-# GitHub Integration for Telex
+# GitHub Tracker Integration for Telex
 
 Monitor your GitHub repositories in real-time and receive notifications about issues, pull requests, and commits directly in your Telex channels.
 
 ## Features
 
-- Real-time webhook notifications for:
-  - New issues and issue updates
-  - Pull request activities
-  - Repository pushes and commits
-- Periodic checks for repository updates
-- Customizable monitoring settings
-- Secure GitHub token authentication
-- Formatted messages with relevant links and details
+- Real-time notifications for GitHub repository events
+- Configurable event monitoring (issues, pull requests, commits)
+- Periodic polling for repository updates
+- Webhook support for instant notifications
+- Organization-level settings management
+- Comprehensive error handling and logging
 
 ## Prerequisites
 
 - Node.js (v14 or higher)
-- npm (v6 or higher)
-- A GitHub account with repository access
-- A Telex account with admin privileges
+- npm or yarn
+- GitHub Personal Access Token
+- A webhook-enabled endpoint to receive notifications
 
 ## Installation
 
 1. Clone the repository:
 ```bash
-git clone <your-repo-url>
-cd github-integration
+git clone https://github.com/telexintegrations/hngx-stage3-Github-Tracker.git
+cd https://github.com/telexintegrations/hngx-stage3-Github-Tracker.git
 ```
 
 2. Install dependencies:
@@ -33,104 +31,216 @@ cd github-integration
 npm install
 ```
 
-3. Create a `.env` file in the root directory:
+3. Create a `.env` file in the root directory with the following variables:
 ```env
 PORT=3000
-TELEX_WEBHOOK_URL=your_telex_webhook_url
+GITHUB_TOKEN=your_github_token
 ```
-
-4. Generate a GitHub Personal Access Token:
-   - Go to GitHub → Settings → Developer settings → Personal access tokens
-   - Click "Generate new token"
-   - Select scopes: `repo` and `admin:repo_hook`
-   - Copy the token for later use
-
-## Local Development
-
-1. Start the server:
-```bash
-node server.js
-```
-
-2. Install and run ngrok for webhook testing:
-```bash
-npm install -g ngrok
-ngrok http 3000
-```
-
-3. Configure GitHub webhook:
-   - Go to your repository → Settings → Webhooks
-   - Add webhook
-   - Payload URL: Your ngrok URL + `/github-webhook`
-   - Content type: `application/json`
-   - Select events: Issues, Pull requests, Pushes
 
 ## Configuration
 
-The integration requires the following settings in Telex:
+The service can be configured through the `integrations.json` file, which includes:
 
-| Setting | Description | Example |
-|---------|-------------|---------|
-| interval | Cron expression for check frequency | */5 * * * * |
-| repository_url | GitHub repository path | owner/repo |
-| events_to_monitor | Events to track | issues,pull_request,push |
-| github_token | GitHub Personal Access Token | ghp_xxxxxxxxxxxx |
+- Integration metadata
+- Application settings
+- Event monitoring preferences
+- Webhook configurations
 
-## Deployment
+### Required Settings
 
-1. Host your integration code (e.g., on Heroku, Railway, or your preferred platform)
-2. Host your `integrations.json` file (can be on GitHub Pages or any static file host)
-3. Update the URLs in `integrations.json`:
-```json
+- `interval`: Cron expression for polling frequency (default: "*/5 * * * *")
+- `repository_url`: GitHub repository URL in format "owner/repo"
+- `events_to_monitor`: Comma-separated list of events to track
+- `github_token`: GitHub Personal Access Token
+- `webhook_url`: Endpoint URL to receive notifications
+
+## API Endpoints
+
+### Register Organization
+```http
+POST /register-org
+Content-Type: application/json
+
 {
-  "tick_url": "https://server/github/tick",
-  "target_url": "https://server/github-webhook"
+  "org_id": "string",
+  "webhook_url": "string",
+  "github_token": "string",
+  "repository_url": "string",
+  "events_to_monitor": "string"
 }
 ```
-4. Configure environment variables on your hosting platform
-5. Update GitHub webhook to point to your production URL
+
+### GitHub Webhook
+```http
+POST /github-webhook
+X-GitHub-Event: [event_type]
+Content-Type: application/json
+
+{
+  "repository": {
+    "full_name": "string"
+  },
+  // Event-specific payload
+}
+```
+
+### Polling Endpoint
+```http
+POST /github/tick
+Content-Type: application/json
+
+{
+  "settings": [
+    {
+      "label": "string",
+      "default": "string"
+    }
+  ]
+}
+```
 
 ## Testing
 
-To test the integration:
+### Unit Testing
 
-1. Create a test issue in your GitHub repository
-2. Make a test commit and push
-3. Create a test pull request
-4. Verify that notifications appear in your Telex channel
-5. Check server logs for any errors
+1. Install dev dependencies:
+```bash
+npm install --save-dev jest @types/jest supertest
+```
 
-For testing the tick endpoint manually:
+2. Run the test suite:
+```bash
+npm test
+```
+
+3. Run specific test files:
+```bash
+npm test github-integration.test.ts
+```
+
+4. Run tests with coverage:
+```bash
+npm run test:coverage
+```
+
+### Local Testing with Postman/cURL
+
+1. Start the local server:
+```bash
+npm start
+```
+
+2. Start the test webhook server:
+```bash
+node test-webhook.js
+```
+
+3. Test webhook endpoint using cURL:
+```bash
+curl -X POST http://localhost:3000/github-webhook \
+  -H "Content-Type: application/json" \
+  -H "X-GitHub-Event: push" \
+  -d '{
+    "repository": {
+      "full_name": "test/repo"
+    },
+    "pusher": {
+      "name": "testuser"
+    },
+    "commits": [
+      {
+        "message": "Test commit"
+      }
+    ]
+  }'
+```
+
+4. Test tick endpoint using cURL:
 ```bash
 curl -X POST http://localhost:3000/github/tick \
   -H "Content-Type: application/json" \
   -d '{
-    "return_url": "your_telex_webhook_url",
-    "settings": {
-      "github_token": "your_token",
-      "repository_url": "owner/repo",
-      "events_to_monitor": "issues,pull_request,push"
-    }
+    "settings": [
+      {
+        "label": "webhook_url",
+        "default": "http://localhost:3001/webhook"
+      },
+      {
+        "label": "github_token",
+        "default": "your_github_token"
+      },
+      {
+        "label": "repository_url",
+        "default": "owner/repo"
+      },
+      {
+        "label": "events_to_monitor",
+        "default": "issues,pull_request,push"
+      }
+    ]
   }'
 ```
 
-## Troubleshooting
+### Testing with Telex
 
-Common issues and solutions:
+1. Configure the Integration:
+   - Log into your Telex dashboard
+   - Navigate to Integrations
+   - Select "Add New Integration"
+   - Choose "GitHub Integration"
+     
+2. Add Webhook Configuration to github:
+   - Open webhook settings in GitHub repository
+   - Add webhook URL (https://hngx-stage3-github-tracker-production.up.railway.app/github-webhook)
+   - Review webhook delivery history in GitHub
 
-1. No messages in Telex:
-   - Verify GitHub webhook is properly configured
-   - Check server logs for webhook receipt
-   - Ensure TELEX_WEBHOOK_URL is correct
-   - Validate GitHub token permissions
+3. Set up Integration Settings:
+   - Enter your GitHub repository URL (owner/repo format)
+   - Paste your GitHub Personal Access Token
+   - Select events to monitor
+   - Configure polling interval
+   - Save the integration settings
 
-2. Webhook errors:
-   - Confirm ngrok is running (for local testing)
-   - Verify webhook URL is accessible
-   - Check GitHub webhook delivery logs
+4. Test Real-time Updates:
+   - Make changes in your GitHub repository:
+     - Create a new issue
+     - Open a pull request
+     - Push a commit
+   - Monitor the Telex activity feed for notifications
 
-3. Integration not working:
-   - Verify all required settings are filled
-   - Check server logs for errors
-   - Ensure GitHub token hasn't expired
-   - Validate repository URL format
+## Event Formatting
+
+The service formats different GitHub events into consistent messages:
+
+- Push events: Include repository name, number of commits, and latest commit message
+- Pull request events: Include PR title, author, and URL
+- Issue events: Include issue title, author, and URL
+
+## Error Handling
+
+The service implements robust error handling for:
+- Invalid webhook URLs
+- Missing required parameters
+- GitHub API failures
+- Malformed repository URLs
+- Event processing errors
+
+## Development
+
+### Directory Structure
+```
+├── index.js           # Main application file
+├── integrations.json  # Configuration file
+├── test/
+│   ├── github-integration.test.ts
+│   └── local-test.js
+└── test-webhook.js    # Test webhook server
+```
+
+### Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
