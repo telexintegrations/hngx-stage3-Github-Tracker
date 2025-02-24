@@ -135,7 +135,7 @@ app.post("/github/tick", async (req, res) => {
       repository_url: settings.find((s) => s.label === "repository_url")
         ?.default,
       events_to_monitor: settings.find((s) => s.label === "events_to_monitor")
-        ?.default,
+        ?.default || "issues,pull_request,push",
     };
     console.log("Webhook URL Retrieved:", settingsObj.webhook_url);
     const webhookUrl = settingsObj.webhook_url?.trim();
@@ -223,7 +223,9 @@ async function fetchGitHubUpdates(settings) {
     console.error("Error parsing repository URL:", error);
     return [];
   }
-  const eventsToMonitor = settings.events_to_monitor.split(",");
+  const eventsToMonitor = typeof settings.events_to_monitor === 'string' 
+  ? settings.events_to_monitor.split(",")
+  : ["issues", "pull_request", "push"];
   let latestEvent = null;
   const allUpdates = [];
 
